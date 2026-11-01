@@ -1,0 +1,28 @@
+[project]
+name = "ai-service"
+version = "0.1.0"
+description = "Trading Lab AI service"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic",
+    "fastapi[standard]",
+    "pgvector",
+    "psycopg[binary]",
+    "pydantic>=2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100

@@ -1,0 +1,21 @@
+name: ai
+
+on:
+  push:
+    branches: [main]
+    paths: ["ai-service/**", ".github/workflows/ai.yml"]
+  pull_request:
+    paths: ["ai-service/**", ".github/workflows/ai.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run pytest

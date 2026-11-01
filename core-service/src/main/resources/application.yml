@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: core-service
+  config:
+    import: optional:file:../.env[.properties]
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
+  http:
+    clients:
+      connect-timeout: 5s
+      read-timeout: 30s
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:tradinglab}
+    username: ${POSTGRES_USER:tradinglab}
+    password: ${POSTGRES_PASSWORD:tradinglab}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+auth:
+  jwt-signing-key: ${JWT_SIGNING_KEY:}
+  access-token-ttl: 15m
+  refresh-token-ttl: 30d
+  # Replays within this window are treated as two tabs racing, not as a stolen token.
+  refresh-reuse-grace: 10s
+  cookie-secure: ${AUTH_COOKIE_SECURE:true}
+  web-origin: ${WEB_ORIGIN:http://localhost:3000}
+
+alpaca:
+  trading-url: https://paper-api.alpaca.markets
+  api-key-id: ${ALPACA_API_KEY_ID:}
+  api-secret-key: ${ALPACA_API_SECRET_KEY:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui

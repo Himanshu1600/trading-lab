@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f5f6f8;
+  --surface: #ffffff;
+  --foreground: #141820;
+  --muted: #5c6675;
+  --border: #e1e4ea;
+  --accent: #0d7a5b;
+  --accent-hover: #0a6349;
+  --accent-foreground: #ffffff;
+  --accent-soft: #e2f3ed;
+  --danger: #bf3328;
+  --danger-soft: #fbeae8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0c0f14;
+    --surface: #151a22;
+    --foreground: #e8ebf0;
+    --muted: #97a3b4;
+    --border: #2a313d;
+    --accent: #38c594;
+    --accent-hover: #5ed6ac;
+    --accent-foreground: #06231a;
+    --accent-soft: #14312a;
+    --danger: #f27c72;
+    --danger-soft: #361b1b;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn:focus-visible,
+  .input:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+
+  .btn-primary {
+    @apply bg-accent text-accent-foreground hover:bg-accent-hover;
+  }
+
+  .btn-secondary {
+    @apply border border-border bg-surface text-foreground hover:bg-background;
+  }
+
+  .btn-ghost {
+    @apply text-muted hover:bg-background hover:text-foreground;
+  }
+
+  .btn-danger {
+    @apply bg-danger-soft text-danger;
+  }
+
+  .btn-danger-ghost {
+    @apply text-muted hover:bg-danger-soft hover:text-danger;
+  }
+
+  .btn-sm {
+    @apply rounded-md px-2.5 py-1 text-xs;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted;
+  }
+
+  .card {
+    @apply rounded-xl border border-border bg-surface shadow-sm;
+  }
+
+  .alert {
+    @apply rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger;
+  }
+}
