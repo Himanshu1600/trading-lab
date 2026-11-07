@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth";
 
 const HIGHLIGHTS = [
   { title: "$0 at risk", text: "Paper money only, never real funds." },
-  { title: "Your watchlists", text: "Search US stocks and group the ones you follow." },
+  { title: "Live US prices", text: "Follow stocks and place practice trades at real prices." },
   { title: "Built to learn", text: "Educational analysis, not investment advice." },
 ];
 
@@ -25,9 +25,14 @@ export default function Home() {
         {!loading && (
           <div className="mt-2 flex gap-3">
             {user ? (
-              <Link href="/watchlists" className="btn btn-primary">
-                Open your watchlists
-              </Link>
+              <>
+                <Link href="/trade" className="btn btn-primary">
+                  Start trading
+                </Link>
+                <Link href="/portfolio" className="btn btn-secondary">
+                  View portfolio
+                </Link>
+              </>
             ) : (
               <>
                 <Link href="/register" className="btn btn-primary">

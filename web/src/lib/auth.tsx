@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   createContext,
   useContext,
@@ -124,4 +125,18 @@ export function useAuth(): AuthContextValue {
     throw new Error("useAuth must be used inside AuthProvider");
   }
   return value;
+}
+
+/** For pages that need a login: returns the user, or null while redirecting to /login. */
+export function useRequireAuth(): User | null {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+    }
+  }, [user, loading, router]);
+
+  return user;
 }

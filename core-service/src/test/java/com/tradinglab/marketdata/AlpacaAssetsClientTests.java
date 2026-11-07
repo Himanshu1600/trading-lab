@@ -19,7 +19,7 @@ class AlpacaAssetsClientTests {
 		RestClient.Builder builder = RestClient.builder();
 		MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
 		AlpacaAssetsClient client = new AlpacaAssetsClient(builder,
-				new AlpacaProperties("https://alpaca.test", "key-id", "secret"));
+				new AlpacaProperties("https://alpaca.test", "https://data.test", "key-id", "secret"));
 		server.expect(requestTo("https://alpaca.test/v2/assets?status=active&asset_class=us_equity"))
 			.andExpect(header("APCA-API-KEY-ID", "key-id"))
 			.andExpect(header("APCA-API-SECRET-KEY", "secret"))

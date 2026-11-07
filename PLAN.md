@@ -539,17 +539,17 @@ Each week ends with a working, deployed-locally increment and green CI.
 ### Week 1 — Market data
 - [ ] `MarketDataProvider` interface; `AlpacaProvider` (WebSocket stream + historical bars REST); `ReplayProvider`
 - [ ] `MarketClock` interface (live + controllable)
-- [ ] `price_bars` hypertable, continuous aggregates, backfill job
+- [x] `price_bars` hypertable and backfill (daily bars, loaded on first view, refreshed hourly; continuous aggregates not yet)
 - [ ] Latest quotes in Redis; STOMP broadcasting with throttling
-- [ ] Chart page: history + live updates
+- [x] Chart page: history (daily candlesticks on the Trade page; live updates not yet)
 - **Done when:** a chart shows 5 years of history plus live (or replayed) ticks; a tick-to-browser latency metric is exposed.
 - **Java to learn:** `java.net.http` WebSocket client, Jackson, `@Scheduled`, virtual threads, Spring WebSocket/STOMP, application events.
 
 ### Week 2 — Paper trading
-- [ ] Accounts, cash ledger, reservations (atomic conditional update)
-- [ ] Orders API with idempotency keys and validation
+- [x] Accounts, cash ledger, reservations (atomic conditional update)
+- [x] Orders API with idempotency keys and validation (market and limit; see docs/APP_FLOW.md for how the first version differs from this plan)
 - [ ] Matching engine: per-symbol single-threaded loop, `TreeMap` books, stop triggers, slippage
-- [ ] Fills → order, position, ledger in one transaction; optimistic locking on positions
+- [x] Fills → order, position, ledger in one transaction; atomic SQL updates on positions
 - [ ] Startup recovery; DAY-order expiry
 - [ ] UI: order ticket, open orders, positions, P&L, live order updates
 - **Done when:** a limit order fills when price crosses it and P&L is correct; a property-based test hammering concurrent orders never makes cash negative.

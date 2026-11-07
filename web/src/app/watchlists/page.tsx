@@ -1,32 +1,38 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 
-import { apiFetch, useAuth } from "@/lib/auth";
+import { SymbolSearch } from "@/components/symbol-search";
+import { apiFetch, useRequireAuth } from "@/lib/auth";
+import {
+  changeClass,
+  dayChangePercent,
+  formatMoney,
+  useQuotes,
+  type Instrument,
+  type Quote,
+} from "@/lib/market";
 
-type Instrument = { symbol: string; name: string; exchange: string };
 type Watchlist = { id: string; name: string; items: Instrument[] };
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
 export default function WatchlistsPage() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
+  const user = useRequireAuth();
   const [lists, setLists] = useState<Watchlist[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const quotes = useQuotes(
+    (lists ?? []).flatMap((list) => list.items.map((item) => item.symbol)),
+  );
 
   useEffect(() => {
-    if (loading) return;
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
+    if (!user) return;
     apiFetch("/api/v1/watchlists")
       .then((response) => response.json())
       .then(setLists)
       .catch(() => setError("Could not load your watchlists."));
-  }, [user, loading, router]);
+  }, [user]);
 
   // Runs a request that returns one watchlist, then swaps it into the page.
   async function update(path: string, init: RequestInit) {
@@ -79,7 +85,7 @@ export default function WatchlistsPage() {
     return `/api/v1/watchlists/${listId}/items/${encodeURIComponent(symbol)}`;
   }
 
-  if (loading || !user) {
+  if (!user) {
     return null;
   }
 
@@ -128,6 +134,7 @@ export default function WatchlistsPage() {
         <WatchlistCard
           key={list.id}
           list={list}
+          quotes={quotes}
           onDelete={() => deleteList(list.id)}
           onAdd={async (symbol) =>
             replaceList(await update(itemPath(list.id, symbol), { method: "POST" }))
@@ -143,11 +150,13 @@ export default function WatchlistsPage() {
 
 function WatchlistCard({
   list,
+  quotes,
   onDelete,
   onAdd,
   onRemove,
 }: {
   list: Watchlist;
+  quotes: Record<string, Quote>;
   onDelete: () => Promise<void>;
   onAdd: (symbol: string) => Promise<void>;
   onRemove: (symbol: string) => Promise<void>;
@@ -188,8 +197,9 @@ function WatchlistCard({
 
       <div className="p-4">
         <SymbolSearch
+          actionLabel="Add"
           existing={list.items.map((item) => item.symbol)}
-          onAdd={onAdd}
+          onSelect={(instrument) => onAdd(instrument.symbol)}
         />
       </div>
 
@@ -199,114 +209,47 @@ function WatchlistCard({
         </p>
       ) : (
         <ul className="divide-y divide-border border-t border-border">
-          {list.items.map((item) => (
-            <li key={item.symbol} className="flex items-center gap-3 px-4 py-2.5">
-              <span className="w-20 shrink-0 font-mono text-sm font-semibold">
-                {item.symbol}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-sm text-muted">
-                {item.name}
-              </span>
-              <span className="hidden text-xs text-muted sm:inline">
-                {item.exchange}
-              </span>
-              <button
-                onClick={() => onRemove(item.symbol)}
-                aria-label={`Remove ${item.symbol}`}
-                className="btn btn-sm btn-danger-ghost"
-              >
-                Remove
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function SymbolSearch({
-  existing,
-  onAdd,
-}: {
-  existing: string[];
-  onAdd: (symbol: string) => Promise<void>;
-}) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Instrument[]>([]);
-  const [searched, setSearched] = useState("");
-  const trimmed = query.trim();
-
-  useEffect(() => {
-    if (!trimmed) return;
-    let stale = false;
-    const timer = setTimeout(() => {
-      apiFetch(`/api/v1/instruments?query=${encodeURIComponent(trimmed)}`)
-        .then((response) => (response.ok ? response.json() : []))
-        .catch(() => [])
-        .then((found) => {
-          if (!stale) {
-            setResults(found);
-            setSearched(trimmed);
-          }
-        });
-    }, 250);
-    return () => {
-      stale = true;
-      clearTimeout(timer);
-    };
-  }, [trimmed]);
-
-  return (
-    <div className="relative">
-      <input
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") setQuery("");
-        }}
-        placeholder="Search by symbol or company"
-        aria-label="Search by symbol or company"
-        className="input"
-      />
-      {trimmed && searched === trimmed && (
-        <ul className="card absolute inset-x-0 top-full z-10 mt-1 overflow-hidden p-1 shadow-lg">
-          {results.length === 0 && (
-            <li className="px-3 py-2 text-sm text-muted">No matches</li>
-          )}
-          {results.slice(0, 6).map((result) => {
-            const added = existing.includes(result.symbol);
+          {list.items.map((item) => {
+            const quote = quotes[item.symbol];
+            const change = quote ? dayChangePercent(quote) : null;
             return (
-              <li key={result.symbol}>
-                <button
-                  disabled={added}
-                  onClick={async () => {
-                    await onAdd(result.symbol);
-                    setQuery("");
-                  }}
-                  className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-background disabled:cursor-default disabled:hover:bg-transparent"
+              <li key={item.symbol} className="flex items-center gap-3 px-4 py-2.5">
+                <span className="w-20 shrink-0 font-mono text-sm font-semibold">
+                  {item.symbol}
+                </span>
+                <span className="hidden min-w-0 flex-1 truncate text-sm text-muted sm:inline">
+                  {item.name}
+                </span>
+                <span className="ml-auto w-24 shrink-0 text-right text-sm">
+                  <span className="block font-medium">
+                    {quote ? formatMoney(quote.last) : "—"}
+                  </span>
+                  {change !== null && (
+                    <span className={`block text-xs ${changeClass(change)}`}>
+                      {change > 0 ? "+" : ""}
+                      {change.toFixed(2)}%
+                    </span>
+                  )}
+                </span>
+                <Link
+                  href={`/trade?symbol=${encodeURIComponent(item.symbol)}`}
+                  aria-label={`Trade ${item.symbol}`}
+                  className="btn btn-sm btn-secondary"
                 >
-                  <span className="w-20 shrink-0 font-mono font-semibold">
-                    {result.symbol}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-muted">
-                    {result.name}
-                  </span>
-                  <span
-                    className={
-                      added
-                        ? "text-xs text-muted"
-                        : "text-xs font-medium text-accent"
-                    }
-                  >
-                    {added ? "Added" : "Add"}
-                  </span>
+                  Trade
+                </Link>
+                <button
+                  onClick={() => onRemove(item.symbol)}
+                  aria-label={`Remove ${item.symbol}`}
+                  className="btn btn-sm btn-danger-ghost"
+                >
+                  Remove
                 </button>
               </li>
             );
           })}
         </ul>
       )}
-    </div>
+    </section>
   );
 }

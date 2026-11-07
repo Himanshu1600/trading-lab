@@ -5,13 +5,19 @@ import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/lib/auth";
 
+const NAV_LINKS = [
+  { href: "/watchlists", label: "Watchlists" },
+  { href: "/trade", label: "Trade" },
+  { href: "/portfolio", label: "Portfolio" },
+];
+
 export function AppHeader() {
   const { user, loading, signOut } = useAuth();
   const pathname = usePathname();
 
   return (
     <header className="border-b border-border bg-surface">
-      <div className="mx-auto flex h-14 w-full max-w-4xl items-center gap-4 px-4">
+      <div className="mx-auto flex min-h-14 w-full max-w-4xl flex-wrap items-center gap-x-4 px-4 py-2">
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
           <span
             aria-hidden
@@ -19,18 +25,21 @@ export function AppHeader() {
           >
             T
           </span>
-          <span className={user ? "hidden sm:inline" : undefined}>Trading Lab</span>
+          Trading Lab
         </Link>
 
         {user && (
-          <nav>
-            <Link
-              href="/watchlists"
-              aria-current={pathname === "/watchlists" ? "page" : undefined}
-              className="btn btn-ghost aria-[current=page]:text-accent"
-            >
-              Watchlists
-            </Link>
+          <nav className="order-last flex w-full gap-1 pt-1 sm:order-none sm:w-auto sm:pt-0">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={pathname === link.href ? "page" : undefined}
+                className="btn btn-ghost aria-[current=page]:text-accent"
+              >
+                {link.label}
+              </Link>
+            ))}
           </nav>
         )}
 
@@ -39,7 +48,7 @@ export function AppHeader() {
             <>
               <span
                 title={user.email}
-                className="max-w-24 truncate text-sm font-medium sm:max-w-48"
+                className="max-w-24 truncate text-sm font-medium sm:max-w-40"
               >
                 {user.name}
               </span>

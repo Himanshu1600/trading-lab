@@ -37,8 +37,19 @@ auth:
 
 alpaca:
   trading-url: https://paper-api.alpaca.markets
+  data-url: https://data.alpaca.markets
   api-key-id: ${ALPACA_API_KEY_ID:}
   api-secret-key: ${ALPACA_API_SECRET_KEY:}
+
+trading:
+  starting-cash: 100000
+  matching-interval: 3s
+  # Market orders fill slightly worse than the quote, as they do in real trading.
+  slippage-bps: 5
+  # Extra cash set aside on market buys, because the fill price isn't known yet.
+  market-buffer-pct: 2
+  # true fills orders while the market is closed, using the last traded price. For local testing only.
+  ignore-market-hours: ${TRADING_IGNORE_MARKET_HOURS:false}
 
 management:
   endpoints:
