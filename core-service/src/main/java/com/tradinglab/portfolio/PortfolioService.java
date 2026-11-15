@@ -66,6 +66,11 @@ public class PortfolioService {
 			.single();
 	}
 
+	/** The user who owns an account, for routing per-user notifications. */
+	public UUID ownerOf(UUID accountId) {
+		return jdbc.sql("SELECT user_id FROM accounts WHERE id = :id").param("id", accountId).query(UUID.class).single();
+	}
+
 	/** Sets cash aside for an open buy. Returns false if the account can't cover it. */
 	@Transactional(propagation = Propagation.MANDATORY)
 	public boolean reserveCash(UUID accountId, BigDecimal amount, UUID orderId) {

@@ -22,6 +22,16 @@ interface OrderRepository extends JpaRepository<PaperOrder, UUID> {
 
 	List<PaperOrder> findByStatusOrderByCreatedAt(PaperOrder.Status status);
 
+	List<PaperOrder> findByStatusAndExpiresAtLessThanEqual(PaperOrder.Status status, Instant now);
+
+	/** Records that a stop order's price was reached. Returns 0 if it already triggered or is no longer open. */
+	@Modifying(clearAutomatically = true)
+	@Query("""
+			update PaperOrder o set o.triggeredAt = :now, o.updatedAt = :now
+			where o.id = :id and o.status = com.tradinglab.trading.PaperOrder.Status.OPEN and o.triggeredAt is null
+			""")
+	int markTriggered(UUID id, Instant now);
+
 	/** Returns 0 if the order already left the expected status, so only one caller can act on it. */
 	@Modifying(clearAutomatically = true)
 	@Query("""

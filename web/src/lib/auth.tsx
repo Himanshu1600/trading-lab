@@ -39,6 +39,21 @@ function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
+export function apiUrl(path: string): string {
+  return `${API_URL}${path}`;
+}
+
+/**
+ * The current access token, refreshed first if there isn't one. For connections that
+ * can't go through apiFetch, such as the realtime WebSocket.
+ */
+export async function getAccessToken(forceRefresh = false): Promise<string | null> {
+  if ((forceRefresh || !accessToken) && !(await refreshSession())) {
+    return null;
+  }
+  return accessToken;
+}
+
 /** Calls core-service as the current user, refreshing an expired token once. */
 export async function apiFetch(
   path: string,
@@ -110,6 +125,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           credentials: "include",
         });
         accessToken = null;
+        // Imported lazily: realtime.ts imports this module, and this avoids a cycle at load time.
+        (await import("@/lib/realtime")).disconnectRealtime();
         setUser(null);
       },
     }),

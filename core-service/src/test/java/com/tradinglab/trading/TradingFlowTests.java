@@ -325,6 +325,87 @@ class TradingFlowTests {
 		}
 	}
 
+	@Test
+	void buyStopWaitsForThePriceToRiseThenFillsLikeAMarketOrder() throws Exception {
+		String id = id(placeJson("{\"symbol\":\"AAPL\",\"side\":\"BUY\",\"type\":\"STOP\",\"qty\":2,\"stopPrice\":110}")
+			.andExpect(status().isCreated()));
+		// The stop price stands in for the quote: 2 x 110 x 1.02.
+		perform(get("/api/v1/account"), token).andExpect(jsonPath("$.reservedCash").value(224.4));
+
+		engine.tick();
+		perform(get("/api/v1/orders"), token).andExpect(jsonPath("$[0].status").value("OPEN"))
+			.andExpect(jsonPath("$[0].triggeredAt").doesNotExist());
+
+		market.price("AAPL", "110");
+		engine.tick();
+		perform(get("/api/v1/orders"), token).andExpect(jsonPath("$[0].id").value(id))
+			.andExpect(jsonPath("$[0].status").value("FILLED"))
+			.andExpect(jsonPath("$[0].triggeredAt").exists())
+			.andExpect(jsonPath("$[0].avgFillPrice").value(110.055));
+	}
+
+	@Test
+	void triggeredStopLimitStaysALimitOrderWhenThePriceMovesBack() throws Exception {
+		buyFilled(10, "100");
+		placeJson("{\"symbol\":\"AAPL\",\"side\":\"SELL\",\"type\":\"STOP_LIMIT\",\"qty\":10,\"stopPrice\":95,"
+				+ "\"limitPrice\":94}")
+			.andExpect(status().isCreated());
+
+		// Falls through the stop and the limit at once: triggered, but 93 is below the 94 limit.
+		market.price("AAPL", "93");
+		engine.tick();
+		perform(get("/api/v1/orders?status=OPEN"), token).andExpect(jsonPath("$[0].triggeredAt").exists());
+
+		// Back above the stop. It stays triggered and fills as a limit order.
+		market.price("AAPL", "96");
+		engine.tick();
+		perform(get("/api/v1/orders"), token).andExpect(jsonPath("$[0].status").value("FILLED"))
+			.andExpect(jsonPath("$[0].avgFillPrice").value(96.0));
+	}
+
+	@Test
+	void dayOrderExpiresAfterTheCloseAndReleasesItsCash() throws Exception {
+		String id = id(placeJson(
+				"{\"symbol\":\"AAPL\",\"side\":\"BUY\",\"type\":\"LIMIT\",\"qty\":5,\"limitPrice\":90,\"timeInForce\":\"DAY\"}")
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.timeInForce").value("DAY"))
+			.andExpect(jsonPath("$.expiresAt").exists()));
+
+		engine.expireDayOrders();
+		perform(get("/api/v1/orders"), token).andExpect(jsonPath("$[0].status").value("OPEN"));
+
+		jdbc.sql("UPDATE orders SET expires_at = now() - interval '1 second' WHERE id = :id")
+			.param("id", UUID.fromString(id))
+			.update();
+		engine.expireDayOrders();
+		perform(get("/api/v1/orders"), token).andExpect(jsonPath("$[0].status").value("EXPIRED"))
+			.andExpect(jsonPath("$[0].rejectReason").value("Day order expired at the close"));
+		perform(get("/api/v1/account"), token).andExpect(jsonPath("$.reservedCash").value(0.0))
+			.andExpect(jsonPath("$.buyingPower").value(100000.0));
+	}
+
+	@Test
+	void gtcOrdersNeverExpire() throws Exception {
+		place("BUY", "LIMIT", 5, "90").andExpect(status().isCreated())
+			.andExpect(jsonPath("$.timeInForce").value("GTC"))
+			.andExpect(jsonPath("$.expiresAt").doesNotExist());
+	}
+
+	@Test
+	void stopOrdersNeedAStopPrice() throws Exception {
+		placeJson("{\"symbol\":\"AAPL\",\"side\":\"BUY\",\"type\":\"STOP\",\"qty\":1}").andExpect(status().isBadRequest());
+		placeJson("{\"symbol\":\"AAPL\",\"side\":\"BUY\",\"type\":\"STOP_LIMIT\",\"qty\":1,\"stopPrice\":100}")
+			.andExpect(status().isBadRequest());
+		placeJson("{\"symbol\":\"AAPL\",\"side\":\"BUY\",\"type\":\"MARKET\",\"qty\":1,\"stopPrice\":100}")
+			.andExpect(status().isBadRequest());
+	}
+
+	private ResultActions placeJson(String body) throws Exception {
+		return perform(post("/api/v1/orders").contentType(MediaType.APPLICATION_JSON)
+			.header("Idempotency-Key", UUID.randomUUID().toString())
+			.content(body), token);
+	}
+
 	private ResultActions place(String side, String type, long qty, String limitPrice) throws Exception {
 		return order(token, "AAPL", side, type, qty, limitPrice, UUID.randomUUID().toString());
 	}

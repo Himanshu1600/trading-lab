@@ -9,7 +9,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +30,6 @@ class AlpacaMarketData implements MarketQuotes, MarketClock, PriceHistorySource 
 	private static final Logger log = LoggerFactory.getLogger(AlpacaMarketData.class);
 
 	private static final int MAX_BAR_PAGES = 20;
-	private static final Duration QUOTE_TTL = Duration.ofSeconds(2);
 	private static final Duration CLOCK_TTL = Duration.ofSeconds(30);
 	private static final Duration CLOCK_RETRY_DELAY = Duration.ofSeconds(10);
 	// Past this age, a remembered clock reading is no longer trusted at all.
@@ -42,18 +40,29 @@ class AlpacaMarketData implements MarketQuotes, MarketClock, PriceHistorySource 
 	private final RestClient dataClient;
 	private final boolean hasKeys;
 	private final java.time.Clock time;
-	private final Map<String, Cached<Quote>> quotes = new ConcurrentHashMap<>();
+	private final QuoteCache quotes;
 	private volatile Cached<Status> clock;
 	private volatile Instant clockRetryAt = Instant.MIN;
 
 	@org.springframework.beans.factory.annotation.Autowired
+	AlpacaMarketData(RestClient.Builder builder, AlpacaProperties properties, QuoteCache quotes) {
+		this(builder, properties, java.time.Clock.systemUTC(), quotes);
+	}
+
+	/** For tests: an in-memory quote cache instead of Redis. */
 	AlpacaMarketData(RestClient.Builder builder, AlpacaProperties properties) {
 		this(builder, properties, java.time.Clock.systemUTC());
 	}
 
 	/** Tests pass a fixed clock, so cache expiry doesn't depend on waiting. */
 	AlpacaMarketData(RestClient.Builder builder, AlpacaProperties properties, java.time.Clock time) {
+		this(builder, properties, time, new QuoteCache.InMemory(time));
+	}
+
+	private AlpacaMarketData(RestClient.Builder builder, AlpacaProperties properties, java.time.Clock time,
+			QuoteCache quotes) {
 		this.time = time;
+		this.quotes = quotes;
 		RestClient.Builder authenticated = builder.defaultHeader("APCA-API-KEY-ID", properties.apiKeyId())
 			.defaultHeader("APCA-API-SECRET-KEY", properties.apiSecretKey());
 		this.tradingClient = authenticated.clone().baseUrl(properties.tradingUrl()).build();
@@ -63,23 +72,12 @@ class AlpacaMarketData implements MarketQuotes, MarketClock, PriceHistorySource 
 
 	@Override
 	public Map<String, Quote> latest(Collection<String> symbols) {
-		Instant now = time.instant();
-		Map<String, Quote> result = new HashMap<>();
-		List<String> missing = new ArrayList<>();
-		for (String symbol : symbols) {
-			Cached<Quote> cached = quotes.get(symbol);
-			if (cached != null && cached.isFresh(now, QUOTE_TTL)) {
-				result.put(symbol, cached.value());
-			}
-			else {
-				missing.add(symbol);
-			}
-		}
+		Map<String, Quote> result = new HashMap<>(quotes.fresh(symbols));
+		List<String> missing = symbols.stream().filter(symbol -> !result.containsKey(symbol)).toList();
 		if (!missing.isEmpty() && hasKeys) {
-			fetch(missing).forEach((symbol, quote) -> {
-				quotes.put(symbol, new Cached<>(quote, now));
-				result.put(symbol, quote);
-			});
+			Map<String, Quote> fetched = fetch(missing);
+			quotes.store(fetched);
+			result.putAll(fetched);
 		}
 		return result;
 	}

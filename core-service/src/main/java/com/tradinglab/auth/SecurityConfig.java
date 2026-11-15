@@ -47,7 +47,11 @@ class SecurityConfig {
 			.authorizeHttpRequests(requests -> requests
 				.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
 				.requestMatchers("/actuator/health/**", "/swagger-ui/**", "/swagger-ui", "/v3/api-docs/**").permitAll()
+				// Read by Prometheus. In production, Caddy forwards only /api and /ws, so it stays internal.
+				.requestMatchers("/actuator/prometheus").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
+				// The WebSocket handshake can't carry a token; StompAuthInterceptor checks it on CONNECT.
+				.requestMatchers("/ws").permitAll()
 				.anyRequest().authenticated())
 			.oauth2ResourceServer(resourceServer -> resourceServer.jwt(Customizer.withDefaults()))
 			.build();

@@ -528,8 +528,8 @@ MARKETDATA_PROVIDER=alpaca   # or replay
 Each week ends with a working, deployed-locally increment and green CI.
 
 ### Week 0 — Foundations and Java ramp-up
-- [ ] Create the repo, Compose file (Timescale + Redis), CI skeleton
-- [ ] Spring Boot project (Spring Initializr), Flyway `V1__init.sql`, global error handling, OpenAPI
+- [x] Create the repo, Compose file (Timescale + Redis), CI skeleton
+- [x] Spring Boot project (Spring Initializr), Flyway `V1__init.sql`, global error handling, OpenAPI
 - [x] Auth: register, login, refresh, `/me`
 - [x] Instruments seeded from Alpaca (starter list until keys are set); watchlist CRUD
 - [x] Next.js skeleton: login page, watchlist page
@@ -540,7 +540,7 @@ Each week ends with a working, deployed-locally increment and green CI.
 - [ ] `MarketDataProvider` interface; `AlpacaProvider` (WebSocket stream + historical bars REST); `ReplayProvider`
 - [ ] `MarketClock` interface (live + controllable)
 - [x] `price_bars` hypertable and backfill (daily bars, loaded on first view, refreshed hourly; continuous aggregates not yet)
-- [ ] Latest quotes in Redis; STOMP broadcasting with throttling
+- [x] Latest quotes in Redis; STOMP broadcasting with throttling (only changed quotes, checked once a second)
 - [x] Chart page: history (daily candlesticks on the Trade page; live updates not yet)
 - **Done when:** a chart shows 5 years of history plus live (or replayed) ticks; a tick-to-browser latency metric is exposed.
 - **Java to learn:** `java.net.http` WebSocket client, Jackson, `@Scheduled`, virtual threads, Spring WebSocket/STOMP, application events.
@@ -548,53 +548,53 @@ Each week ends with a working, deployed-locally increment and green CI.
 ### Week 2 — Paper trading
 - [x] Accounts, cash ledger, reservations (atomic conditional update)
 - [x] Orders API with idempotency keys and validation (market and limit; see docs/APP_FLOW.md for how the first version differs from this plan)
-- [ ] Matching engine: per-symbol single-threaded loop, `TreeMap` books, stop triggers, slippage
+- [ ] Matching engine: per-symbol single-threaded loop, `TreeMap` books (stop triggers and slippage done in the single DB-backed loop)
 - [x] Fills → order, position, ledger in one transaction; atomic SQL updates on positions
-- [ ] Startup recovery; DAY-order expiry
-- [ ] UI: order ticket, open orders, positions, P&L, live order updates
+- [x] Startup recovery (open orders live in the database); DAY-order expiry
+- [x] UI: order ticket, open orders, positions, P&L, live order updates
 - **Done when:** a limit order fills when price crosses it and P&L is correct; a property-based test hammering concurrent orders never makes cash negative.
 - **Java to learn:** `BigDecimal`, `ExecutorService`, `BlockingQueue`, thread confinement, `TreeMap`/`ArrayDeque`, `@Version`, transaction propagation.
 
 ### Week 3 — Backtesting
-- [ ] DSL v1 JSON Schema in `contracts/`; Java validator + sealed-interface AST
-- [ ] Indicators (SMA, EMA, RSI, MACD, Bollinger, ATR) with tests against known values
-- [ ] Backtest engine (next-bar-open execution, stops, fees, slippage), metrics, benchmark
-- [ ] Async runs on virtual threads; completion notification
-- [ ] UI: strategy editor (JSON form), results page (equity curve, drawdown, trades table)
-- **Done when:** the golden test passes, and a 5-year daily SMA-crossover backtest on one symbol runs well under a second (measure and record it).
+- [x] DSL v1 JSON Schema in `contracts/`; Java validator + sealed-interface AST (a strict hand-written parser; the schema's examples are tested against it)
+- [x] Indicators (SMA, EMA, RSI, MACD, Bollinger, ATR) with tests against known values
+- [x] Backtest engine (next-bar-open execution, stops, fees, slippage), metrics, benchmark
+- [x] Async runs on virtual threads; completion notification
+- [x] UI: strategy editor (JSON form), results page (equity curve, drawdown, trades table)
+- **Done when:** the golden test passes, and a 5-year daily SMA-crossover backtest on one symbol runs well under a second (measure and record it). Measured: about 13 ms for 1,260 bars.
 - **Java to learn:** interfaces and polymorphism, sealed interfaces, records, pattern-matching `switch`, generics.
 
 ### Week 4 — AI service + plain-English strategies
-- [ ] FastAPI skeleton, service-token auth, LLM wrapper (logging, budgets, stop-reason handling, caching)
-- [ ] Pydantic DSL models generated from the shared schema
-- [ ] `/v1/strategy/parse` (structured outputs; clarifying questions) and `/v1/backtest/explain`
-- [ ] Core orchestration: draft → validate → save → backtest → explain
-- [ ] UI: "Describe a strategy" box → editable preview → run → explanation
-- [ ] `strategy_gen`, `explain` and `advice_refusal` eval suites + first baseline
+- [x] FastAPI skeleton, service-token auth, LLM wrapper (logging, budgets, stop-reason handling, caching)
+- [x] Pydantic DSL models (hand-written: structured outputs can't take the recursive schema, so the model fills a flatter shape that converts to DSL v1)
+- [x] `/v1/strategy/parse` (structured outputs; clarifying questions) and `/v1/backtest/explain`
+- [x] Core orchestration: draft → validate → save → backtest → explain (with one repair round on validation errors)
+- [x] UI: "Describe a strategy" box → editable preview → run → explanation
+- [x] `strategy_gen`, `explain` and `advice_refusal` eval suites (first baseline still to run: needs an API key)
 - **Done when:** the eval targets in §10 are met, or the gap is understood and written down.
 
 ### Week 5 — Research copilot
-- [ ] EDGAR + news ingestion, section extraction, chunking, embeddings
-- [ ] `doc_chunks` with full-text and vector indexes; hybrid retrieval + RRF (+ optional rerank)
-- [ ] Answering with native citations; SSE streaming through core to the browser
-- [ ] UI: copilot page with clickable citations to the source filing
+- [x] EDGAR ingestion, section extraction, chunking (news and embeddings not done: full-text search needs no second API key)
+- [x] `doc_chunks` with a full-text index (vector index and RRF hybrid retrieval left for later)
+- [x] Answering with native citations (returned whole, not streamed)
+- [x] UI: copilot page with clickable citations to the source filing
 - [ ] `copilot` eval suite; judge-agreement check against your labels
 - **Done when:** answers cite real filing sections with working links, and recall@8 and citation precision are measured.
 
 ### Week 6 — Events, observability, scale
-- [ ] Move ingestion into `market-data-ingestor` publishing to Kafka; core consumes
-- [ ] Externalize order/fill events to Kafka via Spring Modulith's outbox; idempotent consumers
-- [ ] Journal coach (stats in core, narration in ai-service, refreshed on fill events)
-- [ ] OpenTelemetry traces across all services; Grafana dashboards (trading, Kafka lag, LLM cost)
+- [ ] Move ingestion into `market-data-ingestor` publishing to Kafka; core consumes (not done: one poller fits the free data plan)
+- [x] Externalize order/fill events to Kafka via Spring Modulith's outbox; idempotent consumers
+- [x] Journal coach (stats in core, narration in ai-service, refreshed on fill events)
+- [x] Grafana dashboard over Prometheus metrics (OpenTelemetry traces not done; LLM cost is in `llm_calls`)
 - [ ] Gatling load test on the order API; record p95/p99
 - **Done when:** one trace shows a fill flowing core → Kafka → ai-service; dashboards are populated.
 - **Java to learn:** Spring Kafka, consumer groups, partition keys, at-least-once delivery, the transactional outbox pattern.
 
 ### Week 7 — Harden and ship
-- [ ] Rate limits, security pass, loading/empty/error states in the UI
-- [ ] Testcontainers suite, Playwright smoke test, eval job in CI
-- [ ] Deploy (VM + Caddy, Vercel), seeded demo account, replay mode for off-hours
-- [ ] README: architecture diagram, screenshots, measured numbers, how to run locally
+- [x] Rate limits, security pass, loading/empty/error states in the UI
+- [x] Testcontainers suite, Playwright smoke test (eval job runs by hand: it costs money)
+- [ ] Deploy (VM + Caddy, Vercel), seeded demo account, replay mode for off-hours (Docker images, production Compose and Caddy written; not deployed)
+- [x] README: architecture diagram, measured numbers, how to run locally
 - [ ] 2-minute demo video; blog post on the matching engine or on NL → strategy evals
 - **Done when:** a stranger can open the URL, log in to the demo account, place a trade, run an AI-drafted backtest and ask the copilot a question.
 

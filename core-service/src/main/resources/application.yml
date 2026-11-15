@@ -6,6 +6,38 @@ spring:
   threads:
     virtual:
       enabled: true
+  modulith:
+    events:
+      # Delete an event's row once every listener has handled it. Rows still in the table are
+      # the ones waiting to be delivered, which is what makes it an outbox.
+      completion-mode: delete
+      # After a restart, send anything that was committed but never delivered.
+      republish-outstanding-events-on-restart: true
+      externalization:
+        # false keeps events inside core-service: no Kafka needed, and the journal refreshes on read.
+        enabled: ${KAFKA_ENABLED:true}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # Wait for the broker to store the message, and never write a retried message twice.
+      acks: all
+      properties:
+        enable.idempotence: true
+        # If Kafka is down, give up in seconds. The event stays in the outbox and is sent later.
+        max.block.ms: 5000
+        delivery.timeout.ms: 15000
+        request.timeout.ms: 5000
+    consumer:
+      group-id: core-journal
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # A new consumer group starts from the oldest message, so nothing is skipped.
+      auto-offset-reset: earliest
+    listener:
+      auto-startup: ${KAFKA_ENABLED:true}
+      missing-topics-fatal: false
+    admin:
+      operation-timeout: 5s
   mvc:
     problemdetails:
       enabled: true
@@ -51,11 +83,39 @@ trading:
   # true fills orders while the market is closed, using the last traded price. For local testing only.
   ignore-market-hours: ${TRADING_IGNORE_MARKET_HOURS:false}
 
+# Requests allowed per window for the calls that cost something. See RateLimitInterceptor.
+rate-limit:
+  window: 1m
+  # Login and sign-up together, per IP address.
+  auth: 10
+  # The rest are per signed-in user.
+  orders: 60
+  backtests: 20
+  ai: 10
+
+ai:
+  service-url: ${AI_SERVICE_URL:http://localhost:8000}
+  # Shared with the ai-service. Empty turns AI features off: those endpoints answer 503.
+  service-token: ${AI_SERVICE_TOKEN:}
+  # A first copilot question downloads SEC filings before Claude answers.
+  read-timeout: 120s
+
+realtime:
+  # How often watched symbols are checked for a new quote. Only changes are sent.
+  quote-interval: 1s
+
 management:
   endpoints:
     web:
       exposure:
         include: health,info,prometheus
+  metrics:
+    distribution:
+      # Percentile histograms let Grafana show p95 and p99 response times.
+      percentiles-histogram:
+        http.server.requests: true
+    tags:
+      application: core-service
 
 springdoc:
   swagger-ui:

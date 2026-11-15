@@ -1,6 +1,7 @@
 package com.tradinglab.trading;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -27,14 +28,16 @@ class MatchingEngine {
 
 	private final OrderRepository orders;
 	private final OrderFiller filler;
+	private final OrderService orderService;
 	private final MarketQuotes quotes;
 	private final MarketClock clock;
 	private final TradingProperties properties;
 
-	MatchingEngine(OrderRepository orders, OrderFiller filler, MarketQuotes quotes, MarketClock clock,
-			TradingProperties properties) {
+	MatchingEngine(OrderRepository orders, OrderFiller filler, OrderService orderService, MarketQuotes quotes,
+			MarketClock clock, TradingProperties properties) {
 		this.orders = orders;
 		this.filler = filler;
+		this.orderService = orderService;
 		this.quotes = quotes;
 		this.clock = clock;
 		this.properties = properties;
@@ -52,19 +55,39 @@ class MatchingEngine {
 			if (quote == null) {
 				continue;
 			}
+			if (order.isWaitingForStop()) {
+				if (!OrderMatcher.stopTriggered(order.getSide(), order.getStopPrice(), quote)) {
+					continue;
+				}
+				// A triggered stop may fill on this same tick.
+				guarded(order, () -> orderService.trigger(order));
+			}
 			OrderMatcher
-				.fillPrice(order.getSide(), order.getType(), order.getLimitPrice(), quote, properties.slippageBps())
+				.fillPrice(order.getSide(), order.executionType(), order.getLimitPrice(), quote,
+						properties.slippageBps())
 				.ifPresent(price -> fill(order, price));
 		}
 	}
 
-	// One bad order must not stop the others from filling.
+	/** Runs whether or not the market is open, because DAY orders expire after the close. */
+	@Scheduled(initialDelayString = "${trading.matching-interval}", fixedDelayString = "${trading.matching-interval}")
+	void expireDayOrders() {
+		for (PaperOrder order : orders.findByStatusAndExpiresAtLessThanEqual(PaperOrder.Status.OPEN, Instant.now())) {
+			guarded(order, () -> orderService.expire(order.getId()));
+		}
+	}
+
 	private void fill(PaperOrder order, BigDecimal price) {
+		guarded(order, () -> filler.fill(order.getId(), price));
+	}
+
+	// One bad order must not stop the others.
+	private static void guarded(PaperOrder order, Runnable action) {
 		try {
-			filler.fill(order.getId(), price);
+			action.run();
 		}
 		catch (DataAccessException ex) {
-			log.error("Could not fill order {}", order.getId(), ex);
+			log.error("Could not process order {}", order.getId(), ex);
 		}
 	}
 

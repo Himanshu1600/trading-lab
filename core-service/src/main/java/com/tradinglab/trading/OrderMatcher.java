@@ -29,6 +29,18 @@ final class OrderMatcher {
 		return crossed ? Optional.of(money(price)) : Optional.empty();
 	}
 
+	/**
+	 * A buy stop triggers when the last trade rises to the stop price, a sell stop when it falls to it.
+	 * The last trade is used, not bid or ask, so a thin quote can't trigger a stop by itself.
+	 */
+	static boolean stopTriggered(PaperOrder.Side side, BigDecimal stopPrice, Quote quote) {
+		BigDecimal last = quote.markPrice();
+		if (last.signum() <= 0) {
+			return false;
+		}
+		return (side == PaperOrder.Side.BUY) ? last.compareTo(stopPrice) >= 0 : last.compareTo(stopPrice) <= 0;
+	}
+
 	private static BigDecimal money(BigDecimal price) {
 		return price.setScale(4, RoundingMode.HALF_UP);
 	}

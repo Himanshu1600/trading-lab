@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { MarketStatusBadge } from "@/components/market-status";
 import { apiFetch, useRequireAuth } from "@/lib/auth";
 import { changeClass, formatChange, formatMoney } from "@/lib/market";
+import { useOrderEvents, useRealtimeConnected } from "@/lib/realtime";
 
 type Account = {
   cash: number;
@@ -33,22 +34,28 @@ type Order = {
   id: string;
   symbol: string;
   side: "BUY" | "SELL";
-  type: "MARKET" | "LIMIT";
+  type: "MARKET" | "LIMIT" | "STOP" | "STOP_LIMIT";
   qty: number;
   limitPrice: number | null;
-  status: "OPEN" | "FILLED" | "CANCELLED" | "REJECTED";
+  stopPrice: number | null;
+  timeInForce: "DAY" | "GTC";
+  triggeredAt: string | null;
+  status: "OPEN" | "FILLED" | "CANCELLED" | "REJECTED" | "EXPIRED";
   avgFillPrice: number | null;
   rejectReason: string | null;
   createdAt: string;
 };
 
 const REFRESH_MS = 5_000;
+// Order changes are pushed live; this slower refresh keeps prices and P&L current.
+const LIVE_REFRESH_MS = 15_000;
 
 const STATUS_CLASSES: Record<Order["status"], string> = {
   OPEN: "bg-accent-soft text-accent",
   FILLED: "bg-background text-foreground",
   CANCELLED: "bg-background text-muted",
   REJECTED: "bg-danger-soft text-danger",
+  EXPIRED: "bg-background text-muted",
 };
 
 async function readJson<T>(path: string): Promise<T | null> {
@@ -77,12 +84,15 @@ export default function PortfolioPage() {
       .catch(() => setError("Could not refresh your portfolio."));
   }, []);
 
+  const live = useRealtimeConnected();
+  useOrderEvents(load);
+
   useEffect(() => {
     if (!user) return;
     load();
-    const timer = setInterval(load, REFRESH_MS);
+    const timer = setInterval(load, live ? LIVE_REFRESH_MS : REFRESH_MS);
     return () => clearInterval(timer);
-  }, [user, load]);
+  }, [user, load, live]);
 
   async function cancel(id: string) {
     setError(null);
@@ -108,7 +118,7 @@ export default function PortfolioPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Portfolio</h1>
           <p className="mt-1 text-sm text-muted">
-            Paper money only. Values refresh every few seconds.
+            Paper money only. Order updates arrive live.
           </p>
         </div>
         <MarketStatusBadge />
@@ -261,6 +271,7 @@ function Tile({
 
 function OrderSummary({ order }: { order: Order }) {
   const price = order.avgFillPrice ?? order.limitPrice;
+  const waitingForStop = order.stopPrice !== null && !order.triggeredAt && order.status === "OPEN";
 
   return (
     <span className="min-w-0 truncate">
@@ -269,6 +280,11 @@ function OrderSummary({ order }: { order: Order }) {
       <span className="text-muted">
         {" "}
         {price !== null ? `at ${formatMoney(price)}` : "at market"}
+        {order.stopPrice !== null &&
+          (waitingForStop
+            ? `, stop ${formatMoney(order.stopPrice)}`
+            : `, stop ${formatMoney(order.stopPrice)} triggered`)}
+        {order.status === "OPEN" && order.timeInForce === "DAY" && " · day"}
       </span>
     </span>
   );

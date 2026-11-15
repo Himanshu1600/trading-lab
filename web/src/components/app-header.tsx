@@ -9,6 +9,10 @@ const NAV_LINKS = [
   { href: "/watchlists", label: "Watchlists" },
   { href: "/trade", label: "Trade" },
   { href: "/portfolio", label: "Portfolio" },
+  { href: "/strategies", label: "Strategies" },
+  { href: "/backtests", label: "Backtests" },
+  { href: "/journal", label: "Journal" },
+  { href: "/research", label: "Research" },
 ];
 
 export function AppHeader() {
@@ -17,7 +21,7 @@ export function AppHeader() {
 
   return (
     <header className="border-b border-border bg-surface">
-      <div className="mx-auto flex min-h-14 w-full max-w-4xl flex-wrap items-center gap-x-4 px-4 py-2">
+      <div className="mx-auto flex min-h-14 w-full max-w-6xl flex-wrap items-center gap-x-4 px-4 py-2">
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
           <span
             aria-hidden

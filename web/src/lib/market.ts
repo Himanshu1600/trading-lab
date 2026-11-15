@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { apiFetch } from "@/lib/auth";
+import { useLiveQuotes, useRealtimeConnected } from "@/lib/realtime";
 
 export type Instrument = { symbol: string; name: string; exchange: string };
 
@@ -23,6 +24,8 @@ export type MarketStatus = {
 };
 
 const QUOTE_REFRESH_MS = 5_000;
+// With live pushes, an occasional full reload only guards against a missed message.
+const QUOTE_RESYNC_MS = 60_000;
 const CLOCK_REFRESH_MS = 30_000;
 
 const usd = new Intl.NumberFormat("en-US", {
@@ -50,9 +53,18 @@ export function dayChangePercent(quote: Quote): number | null {
   return ((quote.last - quote.previousClose) / quote.previousClose) * 100;
 }
 
+/**
+ * Latest quotes: loaded once over REST, then pushed over the realtime connection as they
+ * change. While that connection is down, it falls back to polling.
+ */
 export function useQuotes(symbols: string[]): Record<string, Quote> {
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
+  const live = useRealtimeConnected();
   const key = [...symbols].sort().join(",");
+
+  useLiveQuotes<Quote>(symbols, (quote) =>
+    setQuotes((current) => ({ ...current, [quote.symbol]: quote })),
+  );
 
   useEffect(() => {
     if (!key) return;
@@ -68,12 +80,12 @@ export function useQuotes(symbols: string[]): Record<string, Quote> {
         });
     }
     load();
-    const timer = setInterval(load, QUOTE_REFRESH_MS);
+    const timer = setInterval(load, live ? QUOTE_RESYNC_MS : QUOTE_REFRESH_MS);
     return () => {
       active = false;
       clearInterval(timer);
     };
-  }, [key]);
+  }, [key, live]);
 
   return quotes;
 }

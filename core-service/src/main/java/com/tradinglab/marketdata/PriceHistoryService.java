@@ -1,6 +1,7 @@
 package com.tradinglab.marketdata;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -25,7 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
  * while Alpaca is called.
  */
 @Service
-class PriceHistoryService {
+class PriceHistoryService implements HistoricalPrices {
 
 	private static final Logger log = LoggerFactory.getLogger(PriceHistoryService.class);
 
@@ -104,6 +105,28 @@ class PriceHistoryService {
 			.param("timeframe", timeframe.code)
 			.param("from", utc(from.get()))
 			.query((rs, row) -> new PriceBar(rs.getObject("time", OffsetDateTime.class).toInstant(),
+					rs.getBigDecimal("open"), rs.getBigDecimal("high"), rs.getBigDecimal("low"),
+					rs.getBigDecimal("close"), rs.getLong("volume")))
+			.list();
+	}
+
+	@Override
+	public List<DailyBar> daily(String symbol, LocalDate from, LocalDate to) {
+		if (!instruments.isTradable(symbol)) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown symbol " + symbol);
+		}
+		refreshIfStale(symbol, BarTimeframe.DAILY);
+		return jdbc.sql("""
+				SELECT ts, open, high, low, close, volume FROM price_bars
+				WHERE symbol = :symbol AND timeframe = :timeframe AND ts >= :from AND ts < :until
+				ORDER BY ts
+				""")
+			.param("symbol", symbol)
+			.param("timeframe", BarTimeframe.DAILY.code)
+			.param("from", utc(from.atStartOfDay(MARKET_ZONE).toInstant()))
+			.param("until", utc(to.plusDays(1).atStartOfDay(MARKET_ZONE).toInstant()))
+			.query((rs, row) -> new DailyBar(
+					rs.getObject("ts", OffsetDateTime.class).atZoneSameInstant(MARKET_ZONE).toLocalDate(),
 					rs.getBigDecimal("open"), rs.getBigDecimal("high"), rs.getBigDecimal("low"),
 					rs.getBigDecimal("close"), rs.getLong("volume")))
 			.list();

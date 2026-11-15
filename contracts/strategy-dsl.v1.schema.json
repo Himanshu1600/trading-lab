@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tradinglab.local/contracts/strategy-dsl.v1.schema.json",
+  "title": "Trading Lab strategy (DSL v1)",
+  "description": "A rule-based trading strategy on daily bars. Rules are checked at each bar's close and orders fill at the next bar's open. core-service's StrategyParser enforces the same rules and is the final authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dslVersion", "name", "symbols", "entry"],
+  "properties": {
+    "dslVersion": { "const": 1 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "symbols": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Za-z][A-Za-z.]{0,9}$" }
+    },
+    "timeframe": { "const": "1D" },
+    "entry": { "$ref": "#/$defs/condition" },
+    "exit": { "$ref": "#/$defs/condition" },
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stopLossPct": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 100 },
+        "takeProfitPct": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000 }
+      }
+    },
+    "sizing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "value"],
+      "properties": {
+        "type": { "enum": ["percentOfEquity", "fixedQty", "fixedCash"] },
+        "value": { "type": "number", "exclusiveMinimum": 0 },
+        "maxPositions": { "type": "integer", "minimum": 1, "maximum": 10 }
+      }
+    }
+  },
+  "$comment": "Rules JSON Schema can't express, checked by StrategyParser: a strategy needs exit or risk.stopLossPct or risk.takeProfitPct; percentOfEquity value <= 100; fixedQty value is a whole number; maxPositions <= number of symbols; MACD fast < slow; conditions nest at most 8 deep and total at most 50; the two operands of a comparison can't both be constants; every symbol must be tradable.",
+  "$defs": {
+    "condition": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "crossesAbove": { "$ref": "#/$defs/pair" },
+        "crossesBelow": { "$ref": "#/$defs/pair" },
+        "gt": { "$ref": "#/$defs/pair" },
+        "lt": { "$ref": "#/$defs/pair" },
+        "all": { "$ref": "#/$defs/conditions" },
+        "any": { "$ref": "#/$defs/conditions" },
+        "not": { "$ref": "#/$defs/condition" }
+      }
+    },
+    "conditions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/condition" }
+    },
+    "pair": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "$ref": "#/$defs/operand" }
+    },
+    "operand": {
+      "oneOf": [
+        { "type": "number" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value"],
+          "properties": { "value": { "type": "number" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["price"],
+          "properties": { "price": { "enum": ["open", "high", "low", "close"] } }
+        },
+        { "$ref": "#/$defs/singleLineIndicator" },
+        { "$ref": "#/$defs/macd" },
+        { "$ref": "#/$defs/bollinger" }
+      ]
+    },
+    "period": { "type": "integer", "minimum": 1, "maximum": 500 },
+    "singleLineIndicator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["indicator", "period"],
+      "properties": {
+        "indicator": { "enum": ["SMA", "EMA", "RSI", "ATR"] },
+        "period": { "$ref": "#/$defs/period" },
+        "output": { "const": "value" }
+      }
+    },
+    "macd": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["indicator"],
+      "properties": {
+        "indicator": { "const": "MACD" },
+        "fast": { "$ref": "#/$defs/period", "default": 12 },
+        "slow": { "$ref": "#/$defs/period", "default": 26 },
+        "signal": { "$ref": "#/$defs/period", "default": 9 },
+        "output": { "enum": ["macd", "signal", "histogram"], "default": "macd" }
+      }
+    },
+    "bollinger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["indicator"],
+      "properties": {
+        "indicator": { "const": "BOLLINGER" },
+        "period": { "$ref": "#/$defs/period", "default": 20 },
+        "stdDev": { "type": "number", "exclusiveMinimum": 0, "maximum": 5, "default": 2 },
+        "output": { "enum": ["upper", "middle", "lower"], "default": "middle" }
+      }
+    }
+  },
+  "examples": [
+    {
+      "dslVersion": 1,
+      "name": "20/50 SMA crossover",
+      "symbols": ["AAPL"],
+      "timeframe": "1D",
+      "entry": { "crossesAbove": [{ "indicator": "SMA", "period": 20 }, { "indicator": "SMA", "period": 50 }] },
+      "exit": { "crossesBelow": [{ "indicator": "SMA", "period": 20 }, { "indicator": "SMA", "period": 50 }] },
+      "risk": { "stopLossPct": 5, "takeProfitPct": 15 },
+      "sizing": { "type": "percentOfEquity", "value": 10 }
+    },
+    {
+      "dslVersion": 1,
+      "name": "RSI dip buyer above the 200-day average",
+      "symbols": ["MSFT", "NVDA"],
+      "entry": {
+        "all": [
+          { "lt": [{ "indicator": "RSI", "period": 14 }, 30] },
+          { "gt": [{ "price": "close" }, { "indicator": "SMA", "period": 200 }] }
+        ]
+      },
+      "exit": { "gt": [{ "indicator": "RSI", "period": 14 }, 70] },
+      "risk": { "stopLossPct": 8 },
+      "sizing": { "type": "percentOfEquity", "value": 50, "maxPositions": 2 }
+    },
+    {
+      "dslVersion": 1,
+      "name": "MACD momentum with a Bollinger exit",
+      "symbols": ["SPY"],
+      "entry": { "crossesAbove": [{ "indicator": "MACD", "output": "macd" }, { "indicator": "MACD", "output": "signal" }] },
+      "exit": { "gt": [{ "price": "close" }, { "indicator": "BOLLINGER", "period": 20, "stdDev": 2, "output": "upper" }] },
+      "sizing": { "type": "fixedCash", "value": 25000 }
+    }
+  ]
+}

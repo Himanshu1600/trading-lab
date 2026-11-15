@@ -25,6 +25,38 @@ class OrderMatcherTests {
 	}
 
 	@Test
+	void buyStopTriggersWhenTheLastTradeRisesToIt() {
+		// The last trade is 99.5, even though the ask is 100.
+		assertThat(OrderMatcher.stopTriggered(Side.BUY, new BigDecimal("99.6"), quote)).isFalse();
+		assertThat(OrderMatcher.stopTriggered(Side.BUY, new BigDecimal("99.5"), quote)).isTrue();
+		assertThat(OrderMatcher.stopTriggered(Side.BUY, new BigDecimal("95"), quote)).isTrue();
+	}
+
+	@Test
+	void sellStopTriggersWhenTheLastTradeFallsToIt() {
+		assertThat(OrderMatcher.stopTriggered(Side.SELL, new BigDecimal("99.4"), quote)).isFalse();
+		assertThat(OrderMatcher.stopTriggered(Side.SELL, new BigDecimal("99.5"), quote)).isTrue();
+		assertThat(OrderMatcher.stopTriggered(Side.SELL, new BigDecimal("105"), quote)).isTrue();
+	}
+
+	@Test
+	void noLastTradeMeansNoTrigger() {
+		Quote noTrades = new Quote("AAPL", BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+		assertThat(OrderMatcher.stopTriggered(Side.BUY, BigDecimal.ONE, noTrades)).isFalse();
+		assertThat(OrderMatcher.stopTriggered(Side.SELL, new BigDecimal("1000"), noTrades)).isFalse();
+	}
+
+	@Test
+	void dayOrdersExpireAtTheNextWeekdayCloseInNewYork() {
+		// Friday 10:00 New York -> Friday 16:00.
+		assertThat(OrderService.regularClose(java.time.Instant.parse("2026-11-06T15:00:00Z")))
+			.isEqualTo("2026-11-06T21:00:00Z");
+		// Friday 17:00 New York -> Monday 16:00.
+		assertThat(OrderService.regularClose(java.time.Instant.parse("2026-11-06T22:00:00Z")))
+			.isEqualTo("2026-11-09T21:00:00Z");
+	}
+
+	@Test
 	void buyLimitFillsOnlyAtOrBelowItsPrice() {
 		assertThat(price(Side.BUY, Type.LIMIT, "99.99")).isEmpty();
 		assertThat(price(Side.BUY, Type.LIMIT, "100")).hasValueSatisfying(p -> assertThat(p).isEqualByComparingTo("100"));

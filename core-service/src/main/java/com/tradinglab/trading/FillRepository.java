@@ -9,4 +9,8 @@ interface FillRepository extends JpaRepository<Fill, UUID> {
 
 	List<Fill> findTop100ByAccountIdOrderByFilledAtDesc(UUID accountId);
 
+	List<Fill> findByAccountIdOrderByFilledAt(UUID accountId);
+
+	long countByAccountId(UUID accountId);
+
 }

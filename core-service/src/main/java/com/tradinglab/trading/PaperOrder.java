@@ -21,11 +21,26 @@ class PaperOrder {
 	}
 
 	enum Type {
-		MARKET, LIMIT
+
+		MARKET, LIMIT, STOP, STOP_LIMIT;
+
+		boolean hasLimitPrice() {
+			return this == LIMIT || this == STOP_LIMIT;
+		}
+
+		boolean hasStopPrice() {
+			return this == STOP || this == STOP_LIMIT;
+		}
+
+	}
+
+	/** DAY expires at the close of the session it was placed for; GTC stays open until filled or cancelled. */
+	enum TimeInForce {
+		DAY, GTC
 	}
 
 	enum Status {
-		OPEN, FILLED, CANCELLED, REJECTED
+		OPEN, FILLED, CANCELLED, REJECTED, EXPIRED
 	}
 
 	@Id
@@ -53,6 +68,16 @@ class PaperOrder {
 
 	private BigDecimal limitPrice;
 
+	private BigDecimal stopPrice;
+
+	private Instant triggeredAt;
+
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false)
+	private TimeInForce timeInForce;
+
+	private Instant expiresAt;
+
 	@Column(nullable = false)
 	private BigDecimal reservedCash;
 
@@ -74,7 +99,8 @@ class PaperOrder {
 	}
 
 	PaperOrder(UUID accountId, String clientOrderId, String symbol, Side side, Type type, long qty,
-			BigDecimal limitPrice, BigDecimal reservedCash) {
+			BigDecimal limitPrice, BigDecimal stopPrice, TimeInForce timeInForce, Instant expiresAt,
+			BigDecimal reservedCash) {
 		this.id = UUID.randomUUID();
 		this.accountId = accountId;
 		this.clientOrderId = clientOrderId;
@@ -83,6 +109,9 @@ class PaperOrder {
 		this.type = type;
 		this.qty = qty;
 		this.limitPrice = limitPrice;
+		this.stopPrice = stopPrice;
+		this.timeInForce = timeInForce;
+		this.expiresAt = expiresAt;
 		this.reservedCash = reservedCash;
 		this.status = Status.OPEN;
 		this.createdAt = Instant.now();
@@ -115,6 +144,35 @@ class PaperOrder {
 
 	BigDecimal getLimitPrice() {
 		return limitPrice;
+	}
+
+	BigDecimal getStopPrice() {
+		return stopPrice;
+	}
+
+	Instant getTriggeredAt() {
+		return triggeredAt;
+	}
+
+	TimeInForce getTimeInForce() {
+		return timeInForce;
+	}
+
+	Instant getExpiresAt() {
+		return expiresAt;
+	}
+
+	/** A stop order whose stop price hasn't been reached yet can't fill. */
+	boolean isWaitingForStop() {
+		return type.hasStopPrice() && triggeredAt == null;
+	}
+
+	/** How the order fills once any stop has triggered: a stop becomes a market order, a stop-limit a limit order. */
+	Type executionType() {
+		return switch (type) {
+			case MARKET, STOP -> Type.MARKET;
+			case LIMIT, STOP_LIMIT -> Type.LIMIT;
+		};
 	}
 
 	BigDecimal getReservedCash() {

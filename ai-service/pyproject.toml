@@ -9,6 +9,7 @@ dependencies = [
     "pgvector",
     "psycopg[binary]",
     "pydantic>=2",
+    "redis>=6",
 ]
 
 [dependency-groups]

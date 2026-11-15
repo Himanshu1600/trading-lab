@@ -1,0 +1,109 @@
+# The whole app on one server behind Caddy (HTTPS). Not used for local development.
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+#
+# Needs a .env with at least DOMAIN, JWT_SIGNING_KEY and POSTGRES_PASSWORD; see .env.example.
+# Only Caddy publishes ports. The database, Redis, Kafka and the services stay on the private network.
+services:
+  timescaledb:
+    image: timescale/timescaledb-ha:pg17.11-ts2.31.0
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tradinglab}
+      POSTGRES_USER: ${POSTGRES_USER:-tradinglab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - timescale-data:/home/postgres/pgdata/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v26.2.7
+    restart: unless-stopped
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --memory=512M
+      - --kafka-addr=internal://0.0.0.0:9092
+      - --advertise-kafka-addr=internal://redpanda:9092
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 5s
+      retries: 20
+
+  core-service:
+    build: ./core-service
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: timescaledb
+      POSTGRES_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      AI_SERVICE_URL: http://ai-service:8000
+      WEB_ORIGIN: https://${DOMAIN:?set DOMAIN}
+      AUTH_COOKIE_SECURE: "true"
+      # Caddy sets X-Forwarded-For, so rate limits see the visitor's address.
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+    depends_on:
+      timescaledb: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      redpanda: { condition: service_healthy }
+
+  ai-service:
+    build: ./ai-service
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: timescaledb
+      POSTGRES_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    depends_on:
+      timescaledb: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  web:
+    build:
+      context: ./web
+      args:
+        NEXT_PUBLIC_API_URL: https://${DOMAIN:?set DOMAIN}
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - core-service
+      - web
+
+volumes:
+  timescale-data:
+  redis-data:
+  redpanda-data:
+  caddy-data:

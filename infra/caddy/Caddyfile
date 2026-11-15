@@ -1,0 +1,17 @@
+# One domain for everything, so the auth cookie and the API share an origin.
+# Caddy gets and renews the HTTPS certificate by itself.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# The API and the live WebSocket go to core-service. /actuator stays private.
+	handle /api/* {
+		reverse_proxy core-service:8080
+	}
+	handle /ws* {
+		reverse_proxy core-service:8080
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}

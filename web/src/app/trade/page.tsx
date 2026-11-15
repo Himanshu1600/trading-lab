@@ -34,7 +34,11 @@ function readLastSymbol(): string {
 }
 
 type Side = "BUY" | "SELL";
-type OrderType = "MARKET" | "LIMIT";
+type OrderType = "MARKET" | "LIMIT" | "STOP" | "STOP_LIMIT";
+type TimeInForce = "DAY" | "GTC";
+
+const hasLimitPrice = (type: OrderType) => type === "LIMIT" || type === "STOP_LIMIT";
+const hasStopPrice = (type: OrderType) => type === "STOP" || type === "STOP_LIMIT";
 type Position = { symbol: string; availableQty: number };
 
 export default function TradePage() {
@@ -67,6 +71,8 @@ function TradeTicket({ symbol, initialSide }: { symbol: string; initialSide: Sid
   const [type, setType] = useState<OrderType>("MARKET");
   const [qty, setQty] = useState("1");
   const [limitPrice, setLimitPrice] = useState("");
+  const [stopPrice, setStopPrice] = useState("");
+  const [timeInForce, setTimeInForce] = useState<TimeInForce>("DAY");
   const [buyingPower, setBuyingPower] = useState<number | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -139,7 +145,9 @@ function TradeTicket({ symbol, initialSide }: { symbol: string; initialSide: Sid
           side,
           type,
           qty: Number(qty),
-          ...(type === "LIMIT" && { limitPrice: Number(limitPrice) }),
+          timeInForce,
+          ...(hasLimitPrice(type) && { limitPrice: Number(limitPrice) }),
+          ...(hasStopPrice(type) && { stopPrice: Number(stopPrice) }),
         }),
       });
       idempotencyKey.current = null;
@@ -167,9 +175,10 @@ function TradeTicket({ symbol, initialSide }: { symbol: string; initialSide: Sid
   }
 
   const shares = Number(qty) || 0;
-  const unitPrice =
-    type === "LIMIT"
-      ? Number(limitPrice) || 0
+  const unitPrice = hasLimitPrice(type)
+    ? Number(limitPrice) || 0
+    : type === "STOP"
+      ? Number(stopPrice) || 0
       : ((side === "BUY" ? quote?.buyPrice : quote?.sellPrice) ?? 0);
   const estimate = shares * unitPrice;
   const available =
@@ -269,6 +278,8 @@ function TradeTicket({ symbol, initialSide }: { symbol: string; initialSide: Sid
             >
               <option value="MARKET">Market</option>
               <option value="LIMIT">Limit</option>
+              <option value="STOP">Stop</option>
+              <option value="STOP_LIMIT">Stop limit</option>
             </select>
           </label>
 
@@ -286,7 +297,27 @@ function TradeTicket({ symbol, initialSide }: { symbol: string; initialSide: Sid
             />
           </label>
 
-          {type === "LIMIT" && (
+          {hasStopPrice(type) && (
+            <label className="flex flex-col gap-1.5 text-sm font-medium">
+              Stop price
+              <input
+                type="number"
+                required
+                min={0.01}
+                step={0.01}
+                value={stopPrice}
+                onChange={(event) => setStopPrice(event.target.value)}
+                className="input font-normal"
+              />
+              <span className="text-xs font-normal text-muted">
+                {side === "BUY"
+                  ? "Becomes active when the price rises to this level."
+                  : "Becomes active when the price falls to this level."}
+              </span>
+            </label>
+          )}
+
+          {hasLimitPrice(type) && (
             <label className="flex flex-col gap-1.5 text-sm font-medium">
               Limit price
               <input
@@ -300,6 +331,18 @@ function TradeTicket({ symbol, initialSide }: { symbol: string; initialSide: Sid
               />
             </label>
           )}
+
+          <label className="flex flex-col gap-1.5 text-sm font-medium">
+            Time in force
+            <select
+              value={timeInForce}
+              onChange={(event) => setTimeInForce(event.target.value as TimeInForce)}
+              className="input font-normal"
+            >
+              <option value="DAY">Day — expires at the close</option>
+              <option value="GTC">Good till cancelled</option>
+            </select>
+          </label>
 
           <dl className="flex flex-col gap-1 text-sm">
             <div className="flex justify-between">

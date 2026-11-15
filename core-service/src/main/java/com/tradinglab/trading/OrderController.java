@@ -81,24 +81,38 @@ class OrderController {
 		return UUID.fromString(jwt.getSubject());
 	}
 
+	/** {@code timeInForce} defaults to GTC. */
 	record PlaceOrderRequest(@NotBlank String symbol, @NotNull PaperOrder.Side side, @NotNull PaperOrder.Type type,
 			@Min(1) @Max(1_000_000) long qty,
-			@DecimalMin(value = "0.0001") @Digits(integer = 10, fraction = 4) BigDecimal limitPrice) {
+			@DecimalMin(value = "0.0001") @Digits(integer = 10, fraction = 4) BigDecimal limitPrice,
+			@DecimalMin(value = "0.0001") @Digits(integer = 10, fraction = 4) BigDecimal stopPrice,
+			PaperOrder.TimeInForce timeInForce) {
 
-		@AssertTrue(message = "limit orders need a limit price, and market orders can't have one")
+		@AssertTrue(message = "limit and stop-limit orders need a limit price, and other orders can't have one")
 		boolean isLimitPriceConsistent() {
-			return (type == PaperOrder.Type.LIMIT) == (limitPrice != null);
+			return type == null || type.hasLimitPrice() == (limitPrice != null);
+		}
+
+		@AssertTrue(message = "stop and stop-limit orders need a stop price, and other orders can't have one")
+		boolean isStopPriceConsistent() {
+			return type == null || type.hasStopPrice() == (stopPrice != null);
+		}
+
+		PaperOrder.TimeInForce timeInForceOrDefault() {
+			return (timeInForce != null) ? timeInForce : PaperOrder.TimeInForce.GTC;
 		}
 
 	}
 
 	record OrderResponse(UUID id, String symbol, PaperOrder.Side side, PaperOrder.Type type, long qty,
-			BigDecimal limitPrice, PaperOrder.Status status, BigDecimal avgFillPrice, String rejectReason,
-			Instant createdAt, Instant updatedAt) {
+			BigDecimal limitPrice, BigDecimal stopPrice, PaperOrder.TimeInForce timeInForce, PaperOrder.Status status,
+			BigDecimal avgFillPrice, String rejectReason, Instant triggeredAt, Instant expiresAt, Instant createdAt,
+			Instant updatedAt) {
 
 		static OrderResponse from(PaperOrder order) {
 			return new OrderResponse(order.getId(), order.getSymbol(), order.getSide(), order.getType(), order.getQty(),
-					order.getLimitPrice(), order.getStatus(), order.getAvgFillPrice(), order.getRejectReason(),
+					order.getLimitPrice(), order.getStopPrice(), order.getTimeInForce(), order.getStatus(),
+					order.getAvgFillPrice(), order.getRejectReason(), order.getTriggeredAt(), order.getExpiresAt(),
 					order.getCreatedAt(), order.getUpdatedAt());
 		}
 
