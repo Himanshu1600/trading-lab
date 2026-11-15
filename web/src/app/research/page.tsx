@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 
 import { SymbolSearch } from "@/components/symbol-search";
+import { AiBadge, AiOffNote, aiReady, useAiStatus } from "@/lib/ai";
 import { apiFetch, useRequireAuth } from "@/lib/auth";
 
 type Answer = {
@@ -20,6 +21,7 @@ export default function ResearchPage() {
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const ai = useAiStatus();
 
   async function ask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,12 +49,17 @@ export default function ResearchPage() {
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Research</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">Research</h1>
+          <AiBadge status={ai} feature="research" />
+        </div>
         <p className="mt-1 text-sm text-muted">
           Ask about a company. Answers come only from its latest 10-K and 10-Q filed with the SEC, and every claim links
           to the passage it came from.
         </p>
       </div>
+
+      <AiOffNote status={ai} feature="research" />
 
       <section className="card flex flex-col gap-4 p-4">
         <SymbolSearch actionLabel="Select" onSelect={(selected) => setSymbol(selected.symbol)} />
@@ -77,7 +84,7 @@ export default function ResearchPage() {
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <button type="submit" disabled={asking || question.trim().length < 3} className="btn btn-primary">
+              <button type="submit" disabled={asking || !aiReady(ai, "research") || question.trim().length < 3} className="btn btn-primary">
                 {asking ? "Reading the filings…" : "Ask"}
               </button>
               <span className="text-xs text-muted">The first question about a stock downloads its filings, which takes a little longer.</span>

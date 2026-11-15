@@ -191,3 +191,16 @@ def test_journal_insights_use_only_the_statistics(fake: FakeLlm) -> None:
     assert first.json()["insights"].startswith("- You won 66.67%")
     assert fake.calls[0]["model"] == "claude-haiku-5-5"
     assert fake.calls[0]["feature"] == "journal_insights"
+
+
+def test_status_reports_which_keys_are_set_without_revealing_them(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_SERVICE_TOKEN", TOKEN)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("SEC_USER_AGENT", "Trading Lab your-email@example.com")
+    settings.cache_clear()
+    try:
+        response = client.get("/v1/status", headers={"X-Service-Token": TOKEN})
+        assert response.json() == {"claude": False, "research": False}
+        assert client.get("/v1/status").status_code == 401
+    finally:
+        settings.cache_clear()

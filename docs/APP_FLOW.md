@@ -747,6 +747,10 @@ Why the AI fills a simpler shape than DSL v1: Claude's structured outputs guaran
 
 The model only narrates. Every number comes from the engine, and the ai-service checks that each number in the text appears in the input, allowing rounding and small counts such as "3 cautions". If one doesn't, it asks once more and names the problem; a second failure returns 502 rather than a wrong number. The explanation is stored in `backtest_runs.explanation`, so asking again costs nothing.
 
+### When AI is switched off
+
+The AI features are always in the app; only the keys that run them are optional. Each AI section (Describe a strategy, Explain these results, Coach's notes, Research) shows a badge from `GET /api/v1/ai/status`: **AI ready**, or **AI · not configured** with the button disabled and a note naming the missing setting. core-service answers from its own token and a call to the ai-service's `GET /v1/status`, which reports only whether `ANTHROPIC_API_KEY` and `SEC_USER_AGENT` are set, never their values. If the ai-service can't be reached, the status says so instead of failing.
+
 ### The ai-service
 
 | Part | File | Job |
@@ -1425,6 +1429,7 @@ All paths start with `/api/v1`. Everything needs `Authorization: Bearer <token>`
 | `GET /fills` | | 200, newest 100 | 401 |
 | `GET /journal` | | 200, `stats`, `fillCount`, `insights`, `insightsCurrent` | 401 |
 | `POST /journal/insights` | | 200, the journal with fresh coach's notes | 409 with no closed trade, 422, 429, 502, 503 |
+| `GET /ai/status` | | 200, `serviceConfigured`, `serviceReachable`, `claude`, `research` (whether each is switched on; keys are never returned) | 401 |
 | `POST /ai/copilot/ask` | `symbol`, `question` (3 to 1,000 characters) | 200, `segments` (text with `citations`) and numbered `sources` | 400, 404, 422, 429, 502, 503 |
 | `GET /strategies` | | 200, newest 100 | 401 |
 | `GET /strategies/{id}` | | 200 | 404 |
@@ -1595,6 +1600,13 @@ Two rules apply throughout:
 ---
 
 ## 22. Change log
+
+### 2026-11-15: AI status shown on every AI feature
+
+- Each AI section shows "AI ready" or "AI · not configured", with the button disabled and a note naming the missing setting, instead of an error after a click.
+- New `GET /api/v1/ai/status` in core-service and `GET /v1/status` in the ai-service.
+- The coach's section on Journal now shows before the first trade.
+- Workflow notes: the browser test's new check failed on Journal, which hid the coach until a trade existed, so the AI feature was invisible to new users. The section now always shows.
 
 ### 2026-11-15: Kafka, journal, research copilot, rate limits, monitoring and deployment
 

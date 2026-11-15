@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,6 +38,15 @@ class AiController {
 		this.ai = ai;
 		this.strategies = strategies;
 		this.instruments = instruments;
+	}
+
+	/**
+	 * Which AI features are switched on, so the page can say so before anyone clicks. The AI code
+	 * is always present; this only reports whether the keys that run it have been configured.
+	 */
+	@GetMapping("/status")
+	AiAssistant.Status status() {
+		return ai.status();
 	}
 
 	/**

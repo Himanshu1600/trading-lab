@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
+import { AiBadge, AiOffNote, aiReady, useAiStatus } from "@/lib/ai";
 import { apiFetch, useRequireAuth } from "@/lib/auth";
 import { TEMPLATES, type SavedStrategy } from "@/lib/backtests";
 
@@ -26,6 +27,7 @@ export default function StrategiesPage() {
   const [text, setText] = useState(pretty(TEMPLATES[0].dsl));
   const [message, setMessage] = useState<Message | null>(null);
   const [busy, setBusy] = useState(false);
+  const ai = useAiStatus();
   const [description, setDescription] = useState("");
   const [drafting, setDrafting] = useState(false);
   // The description an AI draft came from, saved with the strategy so you can see where it started.
@@ -218,9 +220,12 @@ export default function StrategiesPage() {
       </div>
 
       <form onSubmit={draftFromDescription} className="card flex flex-col gap-3 p-4">
-        <label htmlFor="describe" className="font-medium">
-          Describe a strategy
-        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="describe" className="font-medium">
+            Describe a strategy
+          </label>
+          <AiBadge status={ai} />
+        </div>
         <textarea
           id="describe"
           value={description}
@@ -231,13 +236,14 @@ export default function StrategiesPage() {
           className="input resize-y"
         />
         <div className="flex flex-wrap items-center gap-3">
-          <button type="submit" disabled={drafting || description.trim().length < 3} className="btn btn-primary">
+          <button type="submit" disabled={drafting || !aiReady(ai) || description.trim().length < 3} className="btn btn-primary">
             {drafting ? "Drafting…" : "Draft with AI"}
           </button>
           <span className="text-xs text-muted">
             The AI writes the rules; nothing is saved until you check and save them. It gives no investment advice.
           </span>
         </div>
+        <AiOffNote status={ai} />
         {aiNote?.question && (
           <p role="status" className="rounded-lg bg-accent-soft px-3 py-2 text-sm text-accent">
             {aiNote.question}

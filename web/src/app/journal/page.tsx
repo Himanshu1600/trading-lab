@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { AiBadge, AiOffNote, aiReady, useAiStatus } from "@/lib/ai";
 import { apiFetch, useRequireAuth } from "@/lib/auth";
 import { formatPercent } from "@/lib/backtests";
 import { changeClass, formatChange } from "@/lib/market";
@@ -49,6 +50,7 @@ export default function JournalPage() {
   const [journal, setJournal] = useState<Journal | null>(null);
   const [coaching, setCoaching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const ai = useAiStatus();
 
   const load = useCallback(() => {
     apiFetch("/api/v1/journal")
@@ -142,16 +144,21 @@ export default function JournalPage() {
               </tbody>
             </table>
           </section>
+        </>
+      )}
 
-          <section aria-label="Coaching" className="card flex flex-col gap-3 p-4">
+      {/* Always shown, so the AI coach is visible before the first trade. */}
+      <section aria-label="Coaching" className="card flex flex-col gap-3 p-4">
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="font-medium">Coach&apos;s notes</h2>
+              <AiBadge status={ai} />
               {!journal.insightsCurrent && (
-                <button onClick={coach} disabled={coaching || stats.closedTrades === 0} className="btn btn-sm btn-secondary">
+                <button onClick={coach} disabled={coaching || !aiReady(ai) || stats.closedTrades === 0} className="btn btn-sm btn-secondary">
                   {coaching ? "Thinking…" : journal.insights ? "Refresh notes" : "Get coaching"}
                 </button>
               )}
             </div>
+            {!journal.insights && <AiOffNote status={ai} />}
             {stats.closedTrades === 0 && (
               <p className="text-sm text-muted">The coach needs at least one closed trade: buy a stock, then sell it.</p>
             )}
@@ -172,9 +179,7 @@ export default function JournalPage() {
                 </p>
               </>
             )}
-          </section>
-        </>
-      )}
+      </section>
     </main>
   );
 }

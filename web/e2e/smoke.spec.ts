@@ -57,6 +57,16 @@ test("a new user can trade, save a strategy and run a backtest", async ({ page }
     await expect(page.getByRole("link", { name: "20/50 SMA crossover" })).toBeVisible();
   });
 
+  await test.step("every AI feature says whether it's switched on", async () => {
+    const badge = /AI ready|AI · not configured/;
+    const shots = process.env.SCREENSHOT_DIR;
+    for (const path of ["/strategies", "/journal", "/research"]) {
+      await page.goto(path);
+      await expect(page.getByText(badge).first()).toBeVisible();
+      if (shots) await page.screenshot({ path: `${shots}${path}.png`, fullPage: true });
+    }
+  });
+
   expect(pageErrors).toEqual([]);
 });
 

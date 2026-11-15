@@ -31,6 +31,20 @@ public interface AiAssistant {
 	 */
 	Map<String, Object> askCopilot(UUID userId, String symbol, String question);
 
+	/** What's switched on. Never throws: an unreachable ai-service just reports as off. */
+	default Status status() {
+		return new Status(true, true, true, true);
+	}
+
+	/**
+	 * @param serviceConfigured AI_SERVICE_TOKEN is set in core-service
+	 * @param serviceReachable the ai-service answered
+	 * @param claude the ai-service has an Anthropic API key
+	 * @param research the copilot can also reach SEC EDGAR (SEC_USER_AGENT is set)
+	 */
+	record Status(boolean serviceConfigured, boolean serviceReachable, boolean claude, boolean research) {
+	}
+
 	/** {@code kind} is "strategy" (with {@code dsl}) or "clarification" (with {@code question}). */
 	record Draft(String kind, String question, Map<String, Object> dsl, List<String> assumptions) {
 	}

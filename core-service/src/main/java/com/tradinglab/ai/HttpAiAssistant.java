@@ -80,6 +80,20 @@ class HttpAiAssistant implements AiAssistant {
 		return post("/v1/copilot/ask", Map.of("userId", userId.toString(), "symbol", symbol, "question", question));
 	}
 
+	@Override
+	public Status status() {
+		if (!properties.enabled()) {
+			return new Status(false, false, false, false);
+		}
+		try {
+			Map<String, Object> body = client.get().uri("/v1/status").retrieve().body(JSON_OBJECT);
+			return new Status(true, true, Boolean.TRUE.equals(body.get("claude")), Boolean.TRUE.equals(body.get("research")));
+		}
+		catch (RestClientException ex) {
+			return new Status(true, false, false, false);
+		}
+	}
+
 	private Map<String, Object> post(String path, Map<String, Object> body) {
 		if (!properties.enabled()) {
 			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,

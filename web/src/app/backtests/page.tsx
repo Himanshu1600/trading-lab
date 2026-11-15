@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 
 import { EquityChart } from "@/components/equity-chart";
+import { AiBadge, AiOffNote, aiReady, useAiStatus } from "@/lib/ai";
 import { apiFetch, useRequireAuth } from "@/lib/auth";
 import {
   EXIT_REASONS,
@@ -133,6 +134,7 @@ function RunDetail({ runId }: { runId: string }) {
   const [explanation, setExplanation] = useState<string | null>(null);
   const [explaining, setExplaining] = useState(false);
   const [explainError, setExplainError] = useState<string | null>(null);
+  const ai = useAiStatus();
 
   async function explainRun() {
     setExplaining(true);
@@ -265,8 +267,9 @@ function RunDetail({ runId }: { runId: string }) {
           <section aria-label="Explanation" className="card flex flex-col gap-2 p-4">
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="font-medium">In plain English</h2>
+              <AiBadge status={ai} />
               {!(explanation ?? run.explanation) && (
-                <button onClick={explainRun} disabled={explaining} className="btn btn-sm btn-secondary">
+                <button onClick={explainRun} disabled={explaining || !aiReady(ai)} className="btn btn-sm btn-secondary">
                   {explaining ? "Explaining…" : "Explain these results"}
                 </button>
               )}
@@ -282,6 +285,7 @@ function RunDetail({ runId }: { runId: string }) {
                 </p>
               </div>
             )}
+            {!(explanation ?? run.explanation) && <AiOffNote status={ai} />}
             {explainError && (
               <p role="alert" className="alert">
                 {explainError}

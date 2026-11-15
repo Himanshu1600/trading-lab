@@ -62,6 +62,17 @@ Authorized = Depends(require_service_token)
 LlmDep = Annotated[Llm, Depends(llm_dependency)]
 
 
+@router.get("/status", dependencies=[Authorized])
+def status() -> dict[str, bool]:
+    """Which AI features can run here. Keys are never sent back, only whether they're set."""
+    config = settings()
+    user_agent = config.sec_user_agent
+    return {
+        "claude": bool(config.anthropic_api_key),
+        "research": bool(config.anthropic_api_key) and bool(user_agent) and "example.com" not in user_agent,
+    }
+
+
 class ParseRequest(BaseModel):
     prompt: str = Field(min_length=3, max_length=2000)
     userId: str | None = None

@@ -71,7 +71,26 @@ class HttpAiAssistantTests {
 	}
 
 	@Test
+	void statusPassesOnWhichKeysTheAiServiceHas() {
+		server.expect(requestTo("http://ai.test/v1/status"))
+			.andExpect(header("X-Service-Token", "secret-token"))
+			.andRespond(withSuccess("{\"claude\": true, \"research\": false}", MediaType.APPLICATION_JSON));
+
+		assertThat(ai.status()).isEqualTo(new AiAssistant.Status(true, true, true, false));
+	}
+
+	@Test
+	void anUnreachableAiServiceReportsAsOff() {
+		server.expect(requestTo("http://ai.test/v1/status")).andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+
+		assertThat(ai.status()).isEqualTo(new AiAssistant.Status(true, false, false, false));
+	}
+
+	@Test
 	void withoutATokenAiIsOffAndNothingIsSent() {
+		assertThat(new HttpAiAssistant(RestClient.builder(), new AiProperties("http://ai.test", "", null)).status())
+			.isEqualTo(new AiAssistant.Status(false, false, false, false));
+
 		HttpAiAssistant off = new HttpAiAssistant(RestClient.builder(), new AiProperties("http://ai.test", "", null));
 
 		assertThatThrownBy(() -> off.draftStrategy(USER, "x", null, null)).isInstanceOfSatisfying(
